@@ -1,0 +1,43 @@
+from datamodel import OrderDepth, TradingState, Order
+import math
+
+class Trader:
+    def __init__(self):
+        self.ema_underlying = None # To track noise-filtered price
+
+    def run(self, state: TradingState):
+        result = {}
+        # ... (Option Specs: STRIKE, TTE, etc.) ...
+
+        if "VELVETFRUIT" in state.order_depths:
+            v_depth = state.order_depths["VELVETFRUIT"]
+            if v_depth.sell_orders and v_depth.buy_orders:
+                raw_mid = (min(v_depth.sell_orders.keys()) + max(v_depth.buy_orders.keys())) / 2
+                
+                # Apply smoothing to handle "stochasticity"
+                if self.ema_underlying is None:
+                    self.ema_underlying = raw_mid
+                else:
+                    self.ema_underlying = (0.3 * raw_mid) + (0.7 * self.ema_underlying)
+
+        for product in state.order_depths:
+            if product == "VEV_5000":
+                depth = state.order_depths[product]
+                orders = []
+                
+                # Calculate fair value based on SMOOTHED price
+                fair_price, _ = self.calculate_bs(self.ema_underlying, STRIKE, TTE, SIGMA, R)
+                
+                # ILLIQUIDITY CHECK: Only trade if volume > 10
+                # This prevents chasing small "noise" orders
+                if depth.buy_orders:
+                    best_bid = max(depth.buy_orders.keys())
+                    volume_at_bid = depth.buy_orders[best_bid]
+                    
+                    if best_bid > fair_price + 2.5 and volume_at_bid > 10:
+                        orders.append(Order(product, best_bid, -volume_at_bid))
+                
+                result[product] = orders
+        return result
+    
+    # ... (Keep BS math functions) ...
